@@ -562,6 +562,9 @@ $("print-report").onclick = async () => {
   const btn = $("print-report"); btn.disabled = true; btn.textContent = "กำลังสร้าง PDF…";
   const filename = `รายงาน_${PROJECT.toUpperCase()}_${state.date}.pdf`;
   const el = $("report");
+  // html2canvas shifts the capture by the page scroll, which blanked the top of page 1 and cut the signatures off the end
+  const scrollY = window.scrollY, scrollX = window.scrollX;
+  window.scrollTo(0, 0);
   try {
     buildReport();
     if (!window.html2pdf) await new Promise((ok, no) => { const s = document.createElement("script"); s.src = ["https:", "", "cdnjs.cloudflare.com"].join("/") + "/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
@@ -570,7 +573,7 @@ $("print-report").onclick = async () => {
     await html2pdf().set({
       margin: [10, 10, 10, 10], filename,
       image: { type: "jpeg", quality: 0.92 },
-      html2canvas: { scale: 1.6, backgroundColor: "#ffffff", useCORS: true },
+      html2canvas: { scale: 1.6, backgroundColor: "#ffffff", useCORS: true, scrollX: 0, scrollY: 0 },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       pagebreak: { mode: ["css", "legacy"], avoid: ["tr", "h2", ".rp-kpis", ".rp-sign"] }
     }).from(pdfEl).save();
@@ -579,6 +582,7 @@ $("print-report").onclick = async () => {
     const title = document.title; document.title = filename.replace(/\.pdf$/, "");
     window.print(); setTimeout(() => { document.title = title; }, 1000);
   } finally {
+    window.scrollTo(scrollX, scrollY);
     btn.disabled = false; btn.textContent = "บันทึกรายงาน PDF";
   }
 };

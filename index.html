@@ -262,6 +262,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
 <div id="report" hidden></div>
 
 <script>
+// LINE's in-app browser cannot save files, so ask LINE to reopen the page in Chrome/Safari (once; the flag stops a loop)
+const IN_LINE = /Line\//i.test(navigator.userAgent);
+if (IN_LINE && !new URLSearchParams(location.search).has("openExternalBrowser")) {
+  const u = new URL(location.href); u.searchParams.set("openExternalBrowser", "1"); location.replace(u.toString());
+}
 // Talks to the Apps Script JSON API without Google cookies, so phones signed in to several Google accounts still work.
 const PROJECT = (new URLSearchParams(location.search).get("p") || "pt2").toLowerCase();
 const API_URL = "https://script.google.com/macros/s/AKfycbwhyTB7qbM8qwD_8mY_sv3xXAi_0_CpirUAZmaSPiVMVV-uXnPqvnLABfiT5W-uIWtB/exec";
@@ -553,6 +558,7 @@ function buildReport(){
 // Saves the report straight to a PDF file; falls back to the print dialog if the PDF library cannot load
 $("print-report").onclick = async () => {
   if (!ITEMS.length){ toast("ยังโหลดข้อมูลไม่เสร็จ"); return; }
+  if (IN_LINE){ banner("LINE บันทึกไฟล์ไม่ได้ กด ⋮ มุมขวาบน แล้วเลือก เปิดในเบราว์เซอร์อื่น (Chrome) จากนั้นกดปุ่มบันทึกรายงาน PDF อีกครั้ง", true); window.scrollTo(0,0); return; }
   const btn = $("print-report"); btn.disabled = true; btn.textContent = "กำลังสร้าง PDF…";
   const filename = `รายงาน_${PROJECT.toUpperCase()}_${state.date}.pdf`;
   const el = $("report");

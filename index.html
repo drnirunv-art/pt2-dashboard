@@ -176,6 +176,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
 #report .rp-sign div{flex:1;text-align:center;border-top:1px dotted #555;padding-top:6px}
 @media print{
   @page{size:A4;margin:12mm}
+  html,body{background:#fff !important}
   body > *:not(#report){display:none !important}
   #report{display:block !important}
   #report *{-webkit-print-color-adjust:exact;print-color-adjust:exact}

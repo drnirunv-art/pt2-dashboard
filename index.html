@@ -156,6 +156,31 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
   .row .inp{grid-column:1/-1;grid-row:2}
 }
 @media (prefers-reduced-motion:reduce){.pill{transition:none}}
+/* Printed report: only #report is printed; colors kept so ปกติ/ผิดปกติ stay readable on paper */
+#report{font-family:var(--f-body);color:#111;background:#fff}
+#report h1{font-size:20px;margin:0 0 2px}
+#report .rp-sub{color:#555;margin:0 0 12px;font-size:13px}
+#report h2{font-size:15px;margin:16px 0 6px;break-after:avoid}
+#report table{width:100%;border-collapse:collapse;font-size:11.5px}
+#report th,#report td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}
+#report th{background:#ffe600}
+#report td.c,#report th.c{text-align:center}
+#report tr{break-inside:avoid}
+#report .ok{background:#92D050}
+#report .bad{background:#FF0000;color:#fff}
+#report .idle{background:#eee;color:#555}
+#report .rp-kpis{display:flex;gap:10px;margin:8px 0}
+#report .rp-kpis div{border:1px solid #bbb;border-radius:6px;padding:6px 12px;font-size:12px}
+#report .rp-kpis b{display:block;font-size:18px}
+#report .rp-sign{display:flex;justify-content:space-between;gap:40px;margin-top:36px;font-size:12px;break-inside:avoid}
+#report .rp-sign div{flex:1;text-align:center;border-top:1px dotted #555;padding-top:6px}
+@media print{
+  @page{size:A4;margin:12mm}
+  body > *:not(#report){display:none !important}
+  #report{display:block !important}
+  #report *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
 </style>
 
 <div class="wrap">
@@ -193,6 +218,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
           <div class="actions">
             <button class="btn yellow" id="open-sheet">Data Sheet</button>
             <button class="btn" id="export">ดาวน์โหลด Excel (มีสีสถานะ)</button>
+            <button class="btn" id="print-report">พิมพ์รายงาน / PDF</button>
           </div>
         </div>
         <div class="card">
@@ -232,6 +258,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
   <button class="btn primary" id="save">บันทึก</button>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div id="report" hidden></div>
 
 <script>
 // Talks to the Apps Script JSON API without Google cookies, so phones signed in to several Google accounts still work.
@@ -261,7 +288,7 @@ const SYSTEMS = [
   {key:"ระบบไฟฟ้าและสำรองไฟ", label:"ระบบไฟฟ้า/สำรองไฟ"},
   {key:"ระบบสำรองน้ำอาคาร", label:"ระบบสำรองน้ำอาคาร"},
   {key:"Special room", label:"Special room"},
-  {key:"ระบบปรับอากาศและระบายอากาศ", label:"ระบบปรับอากาศและระบายอากาศ", extra:"อุปกรณ์อื่นในระบบ: AHU 42 ชุด · SPT 56 ชุด · FCU 587 ชุด (ยังไม่มีเกณฑ์ในชีท)"},
+  {key:"ระบบปรับอากาศและระบายอากาศ", label:"ระบบปรับอากาศและระบายอากาศ"},
   {key:"ลิฟต์และบันไดเลื่อน", label:"ลิฟต์และบันไดเลื่อน"},
   {key:"ระบบป้องกันอัคคีภัย", label:"ระบบป้องกันอัคคีภัย"},
   {key:"ระบบสุขาภิบาลและบำบัดน้ำเสีย", label:"ระบบสุขาภิบาลและบำบัดน้ำเสีย"},
@@ -347,7 +374,7 @@ function renderDetail(){
     list.length ? list.map((i,n) => { const r = state.values[i.id]; const v = statusOf(i);
       return `<tr><td class="c num">${n+1}</td><td>${esc(i.sys)}</td><td>${esc(i.name)}</td><td>${esc(i.detail)}${r?.by?`<div class="by">${esc(r.by)} · ${new Date(r.at).toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}</div>`:""}</td><td class="c num">${esc(i.ctrl)}</td><td class="c num">${esc(fmt(i,r?.v))}</td><td class="stat ${v===true?'ok':v===false?'bad':'idle'}">${v===true?'ปกติ':v===false?'ผิดปกติ':'ยังไม่ตรวจ'}</td></tr>`;}).join("")
     : `<tr><td colspan="7" class="note" style="padding:16px">ยังไม่มีรายการตรวจสอบของระบบนี้ในชีท</td></tr>`}</tbody>`;
-  $("detail-note").textContent = s.extra || "";
+  $("detail-note").textContent = s.key === "ระบบปรับอากาศและระบายอากาศ" && PROJ.note ? "อุปกรณ์อื่นในระบบ: " + PROJ.note + " (ยังไม่มีเกณฑ์ในชีท)" : "";
 }
 function openDetail(i){ state.sys = i; $("dash-home").hidden = true; $("dash-detail").hidden = false; renderDetail(); window.scrollTo(0,0); }
 $("syslist").addEventListener("click", e => { const b = e.target.closest("[data-sys]"); if (b) openDetail(+b.dataset.sys); });
@@ -457,9 +484,9 @@ function setDate(d){
 }
 function render(){ state.mode === "form" ? renderForm() : renderDashboard(); }
 
-let PROJ = { name: "", sub: "", photo: "" };
+let PROJ = { name: "", sub: "", photo: "", note: "" };
 function applyProject(p){
-  if (!p || (p.name === PROJ.name && p.sub === PROJ.sub && p.photo === PROJ.photo)) return;
+  if (!p || (p.name === PROJ.name && p.sub === PROJ.sub && p.photo === PROJ.photo && p.note === PROJ.note)) return;
   PROJ = p;
   $("proj-name").textContent = p.name; $("proj-sub").textContent = p.sub || ""; $("brand-name").textContent = p.name;
   const img = $("proj-photo");
@@ -491,6 +518,42 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) load
 setMode(MODE);
 banner("กำลังโหลดข้อมูลจาก Google Sheet…");
 load();
+
+
+// ---------- printable report (save as PDF from the print dialog) ----------
+$("print-report").onclick = () => {
+  if (!ITEMS.length){ toast("ยังโหลดข้อมูลไม่เสร็จ"); return; }
+  const thai = new Date(state.date+"T00:00:00").toLocaleDateString("th-TH",{day:"numeric",month:"long",year:"numeric"});
+  const printed = new Date().toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"});
+  let T={total:0,ok:0,bad:0,idle:0};
+  const sysRows = SYSTEMS.filter(s => ITEMS.some(i=>i.sys===s.key)).map(s => {
+    const st = sysStats(s.key); T.total+=st.total;T.ok+=st.ok;T.bad+=st.bad;T.idle+=st.idle;
+    return `<tr><td>${esc(s.key)}</td><td class="c">${st.total}</td><td class="c">${st.ok}</td><td class="c ${st.bad?'bad':''}">${st.bad}</td><td class="c">${st.idle}</td><td class="c">${st.ok+st.bad?(st.ok/st.total*100).toFixed(1)+"%":"–"}</td></tr>`;
+  }).join("");
+  const pct = T.ok+T.bad ? (T.ok/T.total*100).toFixed(1)+"%" : "–";
+  const bads = ITEMS.filter(i => statusOf(i) === false);
+  const who = [...new Set(Object.values(state.values).map(r => r.by).filter(Boolean))].join(", ") || "-";
+  const row = (i,n) => { const r = state.values[i.id]; const v = statusOf(i);
+    return `<tr><td class="c">${n}</td><td>${esc(i.name)}</td><td>${esc(i.detail)}</td><td class="c">${esc(i.ctrl)}</td><td class="c">${esc(fmt(i,r?.v))}</td><td class="c ${v===true?'ok':v===false?'bad':'idle'}">${v===true?'ปกติ':v===false?'ผิดปกติ':'ยังไม่ตรวจ'}</td><td>${r?.by?esc(r.by):""}</td></tr>`; };
+  const head = `<thead><tr><th class="c">ลำดับ</th><th>ชื่อ</th><th>รายละเอียด</th><th class="c">ค่าควบคุม</th><th class="c">ค่าที่ตรวจ</th><th class="c">สถานะ</th><th>ผู้ตรวจ</th></tr></thead>`;
+  const detail = SYSTEMS.filter(s => ITEMS.some(i=>i.sys===s.key)).map(s =>
+    `<h2>${esc(s.key)}</h2><table>${head}<tbody>${ITEMS.filter(i=>i.sys===s.key).map((i,n)=>row(i,n+1)).join("")}</tbody></table>`).join("");
+  $("report").innerHTML = `
+    <h1>รายงานการตรวจสอบระบบประจำวัน · ${esc(PROJ.name)}</h1>
+    <p class="rp-sub">วันที่ตรวจ ${thai}${PROJ.sub ? " · " + esc(PROJ.sub) : ""} · ผู้ตรวจ: ${esc(who)} · พิมพ์เมื่อ ${printed}</p>
+    <div class="rp-kpis"><div><b>${T.total}</b>รายการทั้งหมด</div><div><b>${T.ok}</b>ปกติ</div><div><b>${T.bad}</b>ผิดปกติ</div><div><b>${T.idle}</b>ยังไม่ตรวจ</div><div><b>${pct}</b>% ปกติ</div></div>
+    <h2>สรุปผลแยกตามระบบ</h2>
+    <table><thead><tr><th>ระบบ</th><th class="c">ทั้งหมด</th><th class="c">ปกติ</th><th class="c">ผิดปกติ</th><th class="c">ยังไม่ตรวจ</th><th class="c">% ปกติ</th></tr></thead><tbody>${sysRows}</tbody>
+      <tfoot><tr><th>รวมทั้งหมด</th><th class="c">${T.total}</th><th class="c">${T.ok}</th><th class="c">${T.bad}</th><th class="c">${T.idle}</th><th class="c">${pct}</th></tr></tfoot></table>
+    <h2>รายการผิดปกติ (${bads.length})</h2>
+    ${bads.length ? `<table>${head}<tbody>${bads.map((i,n)=>row(i,n+1)).join("")}</tbody></table>` : `<p>ไม่มีรายการผิดปกติ</p>`}
+    ${detail}
+    <div class="rp-sign"><div>ผู้ตรวจสอบ</div><div>หัวหน้างาน</div><div>ผู้อนุมัติ</div></div>`;
+  const title = document.title;
+  document.title = `รายงาน_${PROJECT.toUpperCase()}_${state.date}`;
+  window.print();
+  setTimeout(() => { document.title = title; }, 1000);
+};
 
 // ---------- Excel export ----------
 $("export").onclick = async () => {

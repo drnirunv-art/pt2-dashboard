@@ -156,24 +156,24 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
   .row .inp{grid-column:1/-1;grid-row:2}
 }
 @media (prefers-reduced-motion:reduce){.pill{transition:none}}
-/* Printed report: only #report is printed; colors kept so ปกติ/ผิดปกติ stay readable on paper */
-#report{font-family:var(--f-body);color:#111;background:#fff}
-#report h1{font-size:20px;margin:0 0 2px}
-#report .rp-sub{color:#555;margin:0 0 12px;font-size:13px}
-#report h2{font-size:15px;margin:16px 0 6px;break-after:avoid}
-#report table{width:100%;border-collapse:collapse;font-size:11.5px}
-#report th,#report td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}
-#report th{background:#ffe600}
-#report td.c,#report th.c{text-align:center}
-#report tr{break-inside:avoid}
-#report .ok{background:#92D050}
-#report .bad{background:#FF0000;color:#fff}
-#report .idle{background:#eee;color:#555}
-#report .rp-kpis{display:flex;gap:10px;margin:8px 0}
-#report .rp-kpis div{border:1px solid #bbb;border-radius:6px;padding:6px 12px;font-size:12px}
-#report .rp-kpis b{display:block;font-size:18px}
-#report .rp-sign{display:flex;justify-content:space-between;gap:40px;margin-top:36px;font-size:12px;break-inside:avoid}
-#report .rp-sign div{flex:1;text-align:center;border-top:1px dotted #555;padding-top:6px}
+/* Printed report: #report is printed, #report-pdf is the copy saved as a PDF file; colors kept so ปกติ/ผิดปกติ stay readable on paper */
+:is(#report,#report-pdf){font-family:var(--f-body);color:#111;background:#fff}
+:is(#report,#report-pdf) h1{font-size:20px;margin:0 0 2px}
+:is(#report,#report-pdf) .rp-sub{color:#555;margin:0 0 12px;font-size:13px}
+:is(#report,#report-pdf) h2{font-size:15px;margin:16px 0 6px;break-after:avoid}
+:is(#report,#report-pdf) table{width:100%;border-collapse:collapse;font-size:11.5px}
+:is(#report,#report-pdf) th,:is(#report,#report-pdf) td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}
+:is(#report,#report-pdf) th{background:#ffe600}
+:is(#report,#report-pdf) td.c,:is(#report,#report-pdf) th.c{text-align:center}
+:is(#report,#report-pdf) tr{break-inside:avoid}
+:is(#report,#report-pdf) .ok{background:#92D050}
+:is(#report,#report-pdf) .bad{background:#FF0000;color:#fff}
+:is(#report,#report-pdf) .idle{background:#eee;color:#555}
+:is(#report,#report-pdf) .rp-kpis{display:flex;gap:10px;margin:8px 0}
+:is(#report,#report-pdf) .rp-kpis div{border:1px solid #bbb;border-radius:6px;padding:6px 12px;font-size:12px}
+:is(#report,#report-pdf) .rp-kpis b{display:block;font-size:18px}
+:is(#report,#report-pdf) .rp-sign{display:flex;justify-content:space-between;gap:40px;margin-top:36px;font-size:12px;break-inside:avoid}
+:is(#report,#report-pdf) .rp-sign div{flex:1;text-align:center;border-top:1px dotted #555;padding-top:6px}
 @media print{
   @page{size:A4;margin:12mm}
   html,body{background:#fff !important}
@@ -219,7 +219,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
           <div class="actions">
             <button class="btn yellow" id="open-sheet">Data Sheet</button>
             <button class="btn" id="export">ดาวน์โหลด Excel (มีสีสถานะ)</button>
-            <button class="btn" id="print-report">พิมพ์รายงาน / PDF</button>
+            <button class="btn" id="print-report">บันทึกรายงาน PDF</button>
           </div>
         </div>
         <div class="card">
@@ -522,8 +522,7 @@ load();
 
 
 // ---------- printable report (save as PDF from the print dialog) ----------
-$("print-report").onclick = () => {
-  if (!ITEMS.length){ toast("ยังโหลดข้อมูลไม่เสร็จ"); return; }
+function buildReport(){
   const thai = new Date(state.date+"T00:00:00").toLocaleDateString("th-TH",{day:"numeric",month:"long",year:"numeric"});
   const printed = new Date().toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"});
   let T={total:0,ok:0,bad:0,idle:0};
@@ -550,10 +549,32 @@ $("print-report").onclick = () => {
     ${bads.length ? `<table>${head}<tbody>${bads.map((i,n)=>row(i,n+1)).join("")}</tbody></table>` : `<p>ไม่มีรายการผิดปกติ</p>`}
     ${detail}
     <div class="rp-sign"><div>ผู้ตรวจสอบ</div><div>หัวหน้างาน</div><div>ผู้อนุมัติ</div></div>`;
-  const title = document.title;
-  document.title = `รายงาน_${PROJECT.toUpperCase()}_${state.date}`;
-  window.print();
-  setTimeout(() => { document.title = title; }, 1000);
+}
+// Saves the report straight to a PDF file; falls back to the print dialog if the PDF library cannot load
+$("print-report").onclick = async () => {
+  if (!ITEMS.length){ toast("ยังโหลดข้อมูลไม่เสร็จ"); return; }
+  const btn = $("print-report"); btn.disabled = true; btn.textContent = "กำลังสร้าง PDF…";
+  const filename = `รายงาน_${PROJECT.toUpperCase()}_${state.date}.pdf`;
+  const el = $("report");
+  try {
+    buildReport();
+    if (!window.html2pdf) await new Promise((ok, no) => { const s = document.createElement("script"); s.src = ["https:", "", "cdnjs.cloudflare.com"].join("/") + "/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    const pdfEl = document.createElement("div");
+    pdfEl.id = "report-pdf"; pdfEl.style.cssText = "background:#fff"; pdfEl.innerHTML = el.innerHTML;
+    await html2pdf().set({
+      margin: [10, 10, 10, 10], filename,
+      image: { type: "jpeg", quality: 0.92 },
+      html2canvas: { scale: 1.6, backgroundColor: "#ffffff", useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["css", "legacy"], avoid: ["tr", "h2", ".rp-kpis", ".rp-sign"] }
+    }).from(pdfEl).save();
+    toast("บันทึกไฟล์ " + filename);
+  } catch (e) {
+    const title = document.title; document.title = filename.replace(/\.pdf$/, "");
+    window.print(); setTimeout(() => { document.title = title; }, 1000);
+  } finally {
+    btn.disabled = false; btn.textContent = "บันทึกรายงาน PDF";
+  }
 };
 
 // ---------- Excel export ----------

@@ -263,7 +263,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--fg)}
 
 <script>
 // LINE's in-app browser cannot save files, so ask LINE to reopen the page in Chrome/Safari (once; the flag stops a loop)
-const IN_LINE = /Line\//i.test(navigator.userAgent);
+const IN_LINE = / Line\//i.test(navigator.userAgent);
 if (IN_LINE && !new URLSearchParams(location.search).has("openExternalBrowser")) {
   const u = new URL(location.href); u.searchParams.set("openExternalBrowser", "1"); location.replace(u.toString());
 }
